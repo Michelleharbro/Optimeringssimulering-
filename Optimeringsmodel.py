@@ -175,5 +175,4 @@ df_final.to_excel(r"C:\Users\miche\OneDrive\Computer\Dokumenter\combined_simulat
 
 print(df_final.head(40))
 
-print (hej Julie)
 
