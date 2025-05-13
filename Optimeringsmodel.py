@@ -95,8 +95,6 @@ for day in df_merged["Weekday"].unique():
         if np.random.rand() < downtime_chance:
             p_transported = 0
             g_transported = 0
-            best_p_wagons = 0
-            best_g_wagons = 0
             final_penalty = 0
             final_cost = 0
             final_revenue = 0
@@ -104,11 +102,18 @@ for day in df_merged["Weekday"].unique():
         else:
             # 3. Optimering: Find bedste vognfordeling
             best_profit = -np.inf
-            best_p_wagons = 0
-            best_g_wagons = 0
 
             for p_wagons in range(0, max_wagons + 1):
                 g_wagons = max_wagons - p_wagons
+
+                total_weight = p_wagons * passenger_wagon_weight + g_wagons * freight_wagon_weight
+                total_length = p_wagons * passenger_wagon_length + g_wagons * freight_wagon_length
+
+                # Hvis løsningen overskrider vægt eller længde, spring den over
+                if total_weight > max_weight or total_length > max_length:
+                    continue
+
+                # Beregner kapacitet og faktisk transport
                 p_cap = p_wagons * passengers_per_wagon
                 g_cap = g_wagons * containers_per_wagon
 
@@ -124,8 +129,6 @@ for day in df_merged["Weekday"].unique():
 
                 if profit > best_profit:
                     best_profit = profit
-                    best_p_wagons = p_wagons
-                    best_g_wagons = g_wagons
                     p_transported = p_trans
                     g_transported = g_trans
                     final_penalty = penalty
@@ -155,8 +158,6 @@ for day in df_merged["Weekday"].unique():
             "Goods Transported": g_transported,
             "Actual Passenger Wagons Used": actual_p_wagons_used,
             "Actual Freight Wagons Used": actual_g_wagons_used,
-            "Passenger Wagons": best_p_wagons,
-            "Goods Wagons": best_g_wagons,
             "Passenger Backlog": passenger_backlog,
             "Goods Backlog": goods_backlog,
             "Passenger Wagons Needed": passenger_wagons_needed,
@@ -173,3 +174,6 @@ df_final = pd.DataFrame(results)
 df_final.to_excel(r"C:\Users\miche\OneDrive\Computer\Dokumenter\combined_simulation_result.xlsx", index=False)
 
 print(df_final.head(40))
+
+print (hej Julie)
+
