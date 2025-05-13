@@ -41,7 +41,7 @@ passenger_wagon_length = 51.4   # meter
 freight_wagon_length = 25.7     # meter
 
 passenger_wagon_weight = 80     # ton
-freight_wagon_weight = 64       # ton (vogn + 2 containere)
+freight_wagon_weight = 64       # ton (vogn 30 ton + 2 containere 2*17 ton)
 
 # Lokomotiv-ekstra kapacitet (kun til passagerer)
 locomotive_passenger_capacity = 40  # ekstra kapacitet udover vogne
@@ -54,7 +54,7 @@ ticket_peak = 159
 ticket_offpeak = 59
 
 # Containerpris (afstandsafhængig – bruges i optimering)
-container_rate = 6  # kr per km per container
+container_rate = 6*124  # kr per km per container
 
 # Penaltys (kan justeres – 0 hvis man blot tracker backlog)
 penalty_passenger_peak = 0
@@ -87,9 +87,12 @@ for day in df_merged["Weekday"].unique():
     for _, row in day_data.iterrows():
         hour = row["Hour"]
 
+        p_demand = int(row["Passenger Demand"])
+        g_demand = int(row["Goods Demand"])
+
         # 1. Total demand = aktuel + ventende fra tidligere time
-        p_demand = int(row["Passenger Demand"]) + passenger_backlog
-        g_demand = int(row["Goods Demand"]) + goods_backlog
+        p_demand_total = int(row["Passenger Demand"]) + passenger_backlog
+        g_demand_total = int(row["Goods Demand"]) + goods_backlog
 
         # 2. Nedbrud
         if np.random.rand() < downtime_chance:
@@ -104,28 +107,31 @@ for day in df_merged["Weekday"].unique():
             best_profit = -np.inf
 
             for p_wagons in range(0, max_wagons + 1):
-                g_wagons = max_wagons - p_wagons
+                for g_wagons in range(0, max_wagons + 1 - p_wagons):
 
-                total_weight = p_wagons * passenger_wagon_weight + g_wagons * freight_wagon_weight
-                total_length = p_wagons * passenger_wagon_length + g_wagons * freight_wagon_length
+                    total_weight = p_wagons * passenger_wagon_weight + g_wagons * freight_wagon_weight
+                    total_length = p_wagons * passenger_wagon_length + g_wagons * freight_wagon_length
 
-                # Hvis løsningen overskrider vægt eller længde, spring den over
-                if total_weight > max_weight or total_length > max_length:
-                    continue
+                    # Hvis løsningen overskrider vægt eller længde, spring den over
+                    if total_weight > max_weight or total_length > max_length:
+                        continue
 
-                # Beregner kapacitet og faktisk transport
-                p_cap = p_wagons * passengers_per_wagon
-                g_cap = g_wagons * containers_per_wagon
+                    # Beregner kapacitet og faktisk transport
+                    p_cap = p_wagons * passengers_per_wagon
+                    if p_demand > 0:
+                        p_cap += locomotive_passenger_capacity  # Lokomotiv bidrager med 40 pladser
 
-                p_trans = min(p_demand, p_cap)
-                g_trans = min(g_demand, g_cap)
+                    g_cap = g_wagons * containers_per_wagon
 
-                price = ticket_peak if hour in peak_hours else ticket_offpeak
-                penalty_passenger = penalty_passenger_peak if hour in peak_hours else penalty_passenger_offpeak
-                revenue = p_trans * price + g_trans * container_rate
-                cost = (p_wagons + g_wagons) * wagon_cost
-                penalty = (p_demand - p_trans) * penalty_passenger + (g_demand - g_trans) * penalty_container
-                profit = revenue - cost - penalty
+                    p_trans = min(p_demand, p_cap)
+                    g_trans = min(g_demand, g_cap)
+
+                    price = ticket_peak if hour in peak_hours else ticket_offpeak
+                    penalty_passenger = penalty_passenger_peak if hour in peak_hours else penalty_passenger_offpeak
+                    revenue = p_trans * price + g_trans * container_rate
+                    cost = (p_wagons + g_wagons) * wagon_cost
+                    penalty = (p_demand - p_trans) * penalty_passenger + (g_demand - g_trans) * penalty_container
+                    profit = revenue - cost - penalty
 
                 if profit > best_profit:
                     best_profit = profit
@@ -154,6 +160,8 @@ for day in df_merged["Weekday"].unique():
             "Hour": hour,
             "Passenger Demand": p_demand,
             "Goods Demand": g_demand,
+            "Passenger demand + backlog": p_demand_total,
+            "Goods demand + backlog": g_demand_total,
             "Passenger Transported": p_transported,
             "Goods Transported": g_transported,
             "Actual Passenger Wagons Used": actual_p_wagons_used,
